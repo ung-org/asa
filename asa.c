@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-#define _XOPEN_SOURCE 700
+#define _POSIX_C_SOURCE 2
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -41,41 +41,48 @@ int asa(const char *path)
 		return 1;
 	}
 
-	while (!feof(f)) {
-		char *line = NULL;
-		size_t n = 0;
+	int c;
+	int newline = -1;
+	while ((c = fgetc(f)) != EOF) {
+		if (newline != 0) {
+			switch (c) {
+			case '0':
+				c = '\n';
+				break;
 
-		if (getline(&line, &n, f) == -1) {
-			if (ferror(f)) {
-				fprintf(stderr, "asa: Couldn't open %s: %s\n", path ? path : "stdin", strerror(errno));
-				return 1;
+			case '1':
+				c = '\f';
+				break;
+
+			case '+':
+				c = '\r';
+				newline = 0;
+				break;
+
+			case ' ':
+			default:
+				c = ' ';
+				break;
 			}
-			if (line) {
-				free(line);
+
+			if (newline == 1) {
+				putchar('\n');
 			}
-			continue;
+
+			if (c != ' ') {
+				putchar(c);
+			}
+			newline = 0;
+		} else if (c == '\n') {
+			newline = 1;
+		} else {
+			newline = 0;
+			putchar(c);
 		}
+	}
 
-		switch(line[0]) {
-		case '0':
-			putchar('\n');
-			break;
-
-		case '1':
-			putchar('\f');
-			break;
-
-		case '+':
-			putchar('\r');
-			break;
-
-		case ' ':
-		default:
-			break;
-		}
-
-		fputs(line + 1, stdout);
-		free(line);
+	if (newline == 1) {
+		putchar('\n');
 	}
 
 	if (f != stdin) {
